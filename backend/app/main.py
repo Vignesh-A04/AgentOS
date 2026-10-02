@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from app.agent.agent import Agent
+from app.agent.graph import agent_graph
 
 
 app = FastAPI(
@@ -10,13 +10,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-
-agent = Agent()
-
-@app.on_event("startup")
-async def startup_event():
-    await agent.llm.load_mcp_tools()
-    await agent.load_mcp_tools()
 
 class AgentRequest(BaseModel):
     message: str
@@ -36,8 +29,11 @@ def health_check():
 
 @app.post("/agent/run", response_model=AgentResponse)
 def run_agent(request: AgentRequest):
-    response = agent.run(request.message)
+    result = agent_graph.invoke({
+        "message": request.message,
+        "response": "",
+    })
 
     return AgentResponse(
-        response=response
+        response=result["response"]
     )
