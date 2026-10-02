@@ -1,5 +1,6 @@
 from app.agent.llm import LLMClient
 from app.tools.registry import TOOL_REGISTRY
+from app.tools.permissions import is_tool_allowed
 
 
 class Agent:
@@ -35,9 +36,19 @@ class Agent:
                 print(f"Name: {tool_name}")
                 print(f"Arguments: {tool_args}")
 
+                print(
+                    f"Permission: "
+                    f"{'allowed' if is_tool_allowed(tool_name) else 'denied'}"
+                )
+                
                 if tool_name not in TOOL_REGISTRY:
                     raise ValueError(
                         f"Unknown tool: {tool_name}"
+                    )
+
+                if not is_tool_allowed(tool_name):
+                    raise PermissionError(
+                        f"Tool execution denied: {tool_name}"
                     )
 
                 tool_function = TOOL_REGISTRY[tool_name]
