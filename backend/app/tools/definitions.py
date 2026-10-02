@@ -107,3 +107,27 @@ LIST_FILES_TOOL = {
         "required": [],
     },
 }
+
+API_GET_TOOL = {
+    "name": "api_get",
+    "description": (
+        "Send an HTTP GET request to a REST API "
+        "and return the JSON response. "
+        "Use this when external API data is required."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "url": {
+                "type": "STRING",
+                "description": (
+                    "The complete HTTP or HTTPS URL "
+                    "of the REST API endpoint."
+                ),
+            },
+        },
+        "required": [
+            "url",
+        ],
+    },
+}

@@ -4,6 +4,7 @@ from app.tools.filesystem import (
     read_file,
     list_files,
 )
+from app.tools.api import api_get
 
 
 TOOL_REGISTRY = {
@@ -11,4 +12,5 @@ TOOL_REGISTRY = {
     "create_file": create_file,
     "read_file": read_file,
     "list_files": list_files,
+    "api_get": api_get,
 }
