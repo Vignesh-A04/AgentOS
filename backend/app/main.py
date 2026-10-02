@@ -13,6 +13,10 @@ app = FastAPI(
 
 agent = Agent()
 
+@app.on_event("startup")
+async def startup_event():
+    await agent.llm.load_mcp_tools()
+    await agent.load_mcp_tools()
 
 class AgentRequest(BaseModel):
     message: str

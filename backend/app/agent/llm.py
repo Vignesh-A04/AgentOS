@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+from app.mcp.manager import MCPManager
+
 from app.tools.definitions import (
     CALCULATOR_TOOL,
     CREATE_FILE_TOOL,
@@ -35,12 +37,15 @@ class LLMClient:
             api_key=api_key
         )
 
-        self.tools = self._build_tools()
+        self.mcp_manager = MCPManager()
 
-    def _build_tools(self):
+        # Build local tools first.
+        # MCP tools are loaded asynchronously during FastAPI startup.
+        self.tools = self._build_local_tools()
+
+    def _build_local_tools(self):
         """
-        Build the Gemini tool definition containing
-        all tools available to the AgentOS agent.
+        Build the local AgentOS tool catalog.
         """
 
         tool_definitions = [
@@ -65,15 +70,44 @@ class LLMClient:
             function_declarations=function_declarations
         )
 
-    def _config(self):
+    async def load_mcp_tools(self):
         """
-        Configuration used for every Gemini request.
+        Discover MCP tools and add them
+        to the Gemini tool catalog.
         """
 
+        mcp_tools = await self.mcp_manager.list_tools()
+
+        print("\nMCP TOOLS DISCOVERED")
+
+        for tool in mcp_tools:
+            print(
+                f"Name: {tool.name}"
+            )
+
+            print(
+                f"Description: {tool.description}"
+            )
+
+            print(
+                f"Schema: {tool.input_schema}"
+            )
+
+            self.tools.function_declarations.append(
+                types.FunctionDeclaration(
+                    name=tool.name,
+                    description=tool.description or "",
+                    parameters=tool.input_schema,
+                )
+            )
+
+    def _config(self):
         return types.GenerateContentConfig(
             system_instruction=(
                 "You are AgentOS, a helpful AI engineering agent. "
-                "Use available tools when they are useful."
+                "Use available tools when they are useful. "
+                "Some tools are provided directly by AgentOS, "
+                "while others are provided through MCP servers."
             ),
             tools=[
                 self.tools
@@ -86,10 +120,6 @@ class LLMClient:
         )
 
     def generate(self, message: str):
-        """
-        Send the initial user request to Gemini.
-        """
-
         return self.client.models.generate_content(
             model=self.model,
             contents=message,
@@ -102,16 +132,9 @@ class LLMClient:
         original_response,
         tool_results,
     ):
-        """
-        Send executed tool results back to Gemini
-        so it can continue reasoning and produce
-        the final response or request another tool.
-        """
-
         function_response_parts = []
 
         for item in tool_results:
-
             function_call = item["function_call"]
             tool_result = item["result"]
 
@@ -136,9 +159,7 @@ class LLMClient:
                     )
                 ],
             ),
-
             original_response.candidates[0].content,
-
             types.Content(
                 role="user",
                 parts=function_response_parts,
