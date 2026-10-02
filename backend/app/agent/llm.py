@@ -4,7 +4,12 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-from app.tools.definitions import CALCULATOR_TOOL
+from app.tools.definitions import (
+    CALCULATOR_TOOL,
+    CREATE_FILE_TOOL,
+    READ_FILE_TOOL,
+    LIST_FILES_TOOL,
+)
 
 
 load_dotenv()
@@ -28,23 +33,38 @@ class LLMClient:
             api_key=api_key
         )
 
-        self.calculator_tool = self._build_calculator_tool()
+        self.tools = self._build_tools()
 
-    def _build_calculator_tool(self):
+    def _build_tools(self):
+        """
+        Build the Gemini tool definition containing
+        all tools available to the AgentOS agent.
+        """
 
-        calculator_declaration = types.FunctionDeclaration(
-            name=CALCULATOR_TOOL["name"],
-            description=CALCULATOR_TOOL["description"],
-            parameters=CALCULATOR_TOOL["parameters"],
-        )
+        tool_definitions = [
+            CALCULATOR_TOOL,
+            CREATE_FILE_TOOL,
+            READ_FILE_TOOL,
+            LIST_FILES_TOOL,
+        ]
+
+        function_declarations = [
+            types.FunctionDeclaration(
+                name=tool["name"],
+                description=tool["description"],
+                parameters=tool["parameters"],
+            )
+            for tool in tool_definitions
+        ]
 
         return types.Tool(
-            function_declarations=[
-                calculator_declaration
-            ]
+            function_declarations=function_declarations
         )
 
     def _config(self):
+        """
+        Configuration used for every Gemini request.
+        """
 
         return types.GenerateContentConfig(
             system_instruction=(
@@ -52,14 +72,19 @@ class LLMClient:
                 "Use available tools when they are useful."
             ),
             tools=[
-                self.calculator_tool
+                self.tools
             ],
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                disable=True
+            automatic_function_calling=(
+                types.AutomaticFunctionCallingConfig(
+                    disable=True
+                )
             ),
         )
 
     def generate(self, message: str):
+        """
+        Send the initial user request to Gemini.
+        """
 
         return self.client.models.generate_content(
             model=self.model,
@@ -73,6 +98,11 @@ class LLMClient:
         original_response,
         tool_results,
     ):
+        """
+        Send executed tool results back to Gemini
+        so it can continue reasoning and produce
+        the final response or request another tool.
+        """
 
         function_response_parts = []
 

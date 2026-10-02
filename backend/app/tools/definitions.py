@@ -34,3 +34,76 @@ CALCULATOR_TOOL = {
         ]
     }
 }
+
+CREATE_FILE_TOOL = {
+    "name": "create_file",
+    "description": (
+        "Create a text file inside the AgentOS workspace. "
+        "Use this when the user asks you to create or write a file."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "path": {
+                "type": "STRING",
+                "description": (
+                    "Workspace-relative file path, "
+                    "for example outputs/report.txt."
+                ),
+            },
+            "content": {
+                "type": "STRING",
+                "description": "The text content to write.",
+            },
+        },
+        "required": [
+            "path",
+            "content",
+        ],
+    },
+}
+
+
+READ_FILE_TOOL = {
+    "name": "read_file",
+    "description": (
+        "Read the contents of a text file "
+        "inside the AgentOS workspace."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "path": {
+                "type": "STRING",
+                "description": (
+                    "Workspace-relative file path."
+                ),
+            },
+        },
+        "required": [
+            "path",
+        ],
+    },
+}
+
+
+LIST_FILES_TOOL = {
+    "name": "list_files",
+    "description": (
+        "List files and directories inside "
+        "the AgentOS workspace."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "path": {
+                "type": "STRING",
+                "description": (
+                    "Workspace-relative directory path. "
+                    "Use '.' for the workspace root."
+                ),
+            },
+        },
+        "required": [],
+    },
+}
