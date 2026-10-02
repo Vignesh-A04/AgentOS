@@ -131,3 +131,27 @@ API_GET_TOOL = {
         ],
     },
 }
+
+WEB_SEARCH_TOOL = {
+    "name": "web_search",
+    "description": (
+        "Search the web for current or external information. "
+        "Use this tool when the user asks for information "
+        "that requires searching the internet."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "query": {
+                "type": "STRING",
+                "description": (
+                    "The search query to send "
+                    "to the web search engine."
+                ),
+            },
+        },
+        "required": [
+            "query",
+        ],
+    },
+}

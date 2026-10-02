@@ -10,6 +10,7 @@ from app.tools.definitions import (
     READ_FILE_TOOL,
     LIST_FILES_TOOL,
     API_GET_TOOL,
+    WEB_SEARCH_TOOL,
 )
 
 
@@ -48,6 +49,7 @@ class LLMClient:
             READ_FILE_TOOL,
             LIST_FILES_TOOL,
             API_GET_TOOL,
+            WEB_SEARCH_TOOL,
         ]
 
         function_declarations = [
