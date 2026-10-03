@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+
 import "./App.css";
 
-const API_URL = "http://localhost:8000";
+
+// =========================================
+// API
+// =========================================
+
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+
+// =========================================
+// TYPES
+// =========================================
 
 type ToolCall = {
   name: string;
@@ -11,6 +23,7 @@ type ToolCall = {
   result?: unknown;
 };
 
+
 type Message = {
   id: number;
   role: "user" | "assistant";
@@ -18,10 +31,16 @@ type Message = {
   tools?: ToolCall[];
 };
 
+
 type AgentResponse = {
   response: string;
   tools?: ToolCall[];
 };
+
+
+// =========================================
+// APP
+// =========================================
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -29,7 +48,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [backendOnline, setBackendOnline] = useState(true);
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef =
+    useRef<HTMLDivElement | null>(null);
+
+
+  // =========================================
+  // AUTO SCROLL
+  // =========================================
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
@@ -37,9 +62,16 @@ function App() {
     });
   }, [messages, loading]);
 
+
+  // =========================================
+  // BACKEND HEALTH
+  // =========================================
+
   async function checkBackend() {
     try {
-      const response = await fetch(`${API_URL}/health`);
+      const response = await fetch(
+        `${API_URL}/health`
+      );
 
       setBackendOnline(response.ok);
     } catch {
@@ -47,13 +79,22 @@ function App() {
     }
   }
 
+
   useEffect(() => {
     checkBackend();
 
-    const interval = setInterval(checkBackend, 10000);
+    const interval = setInterval(
+      checkBackend,
+      10000
+    );
 
     return () => clearInterval(interval);
   }, []);
+
+
+  // =========================================
+  // SEND MESSAGE
+  // =========================================
 
   async function sendMessage() {
     const message = input.trim();
@@ -62,11 +103,13 @@ function App() {
       return;
     }
 
+
     const userMessage: Message = {
       id: Date.now(),
       role: "user",
       content: message,
     };
+
 
     setMessages((previous) => [
       ...previous,
@@ -76,23 +119,28 @@ function App() {
     setInput("");
     setLoading(true);
 
+
     try {
       const response = await fetch(
         `${API_URL}/agent/run`,
         {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json",
           },
-        body: JSON.stringify({
-          message,
-          history: messages.map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
-        }),
+
+          body: JSON.stringify({
+            message,
+
+            history: messages.map((msg) => ({
+              role: msg.role,
+              content: msg.content,
+            })),
+          }),
         }
       );
+
 
       if (!response.ok) {
         throw new Error(
@@ -100,8 +148,10 @@ function App() {
         );
       }
 
+
       const data: AgentResponse =
         await response.json();
+
 
       const assistantMessage: Message = {
         id: Date.now() + 1,
@@ -112,16 +162,19 @@ function App() {
         tools: data.tools || [],
       };
 
+
       setMessages((previous) => [
         ...previous,
         assistantMessage,
       ]);
 
       setBackendOnline(true);
+
     } catch (error) {
       console.error(error);
 
       setBackendOnline(false);
+
 
       const errorMessage: Message = {
         id: Date.now() + 1,
@@ -130,14 +183,21 @@ function App() {
           "Sorry, I couldn't connect to the AgentOS backend.",
       };
 
+
       setMessages((previous) => [
         ...previous,
         errorMessage,
       ]);
+
     } finally {
       setLoading(false);
     }
   }
+
+
+  // =========================================
+  // KEYBOARD
+  // =========================================
 
   function handleKeyDown(
     event: React.KeyboardEvent<HTMLTextAreaElement>
@@ -151,19 +211,34 @@ function App() {
     }
   }
 
+
+  // =========================================
+  // NEW CHAT
+  // =========================================
+
   function startNewChat() {
     setMessages([]);
     setInput("");
   }
 
+
+  // =========================================
+  // FORMAT VALUES
+  // =========================================
+
   function formatValue(value: unknown): string {
-    if (value === null || value === undefined) {
+    if (
+      value === null ||
+      value === undefined
+    ) {
       return "";
     }
+
 
     if (typeof value === "string") {
       return value;
     }
+
 
     try {
       return JSON.stringify(value);
@@ -172,12 +247,14 @@ function App() {
     }
   }
 
+
   function formatArguments(
     args?: Record<string, unknown>
   ) {
     if (!args) {
       return null;
     }
+
 
     return Object.entries(args).map(
       ([key, value]) => (
@@ -191,6 +268,11 @@ function App() {
     );
   }
 
+
+  // =========================================
+  // TOOL RESULTS
+  // =========================================
+
   function getToolResult(
     tool: ToolCall
   ): string {
@@ -201,17 +283,26 @@ function App() {
       return `Search completed — ${tool.result.length} results found`;
     }
 
+
     if (
       tool.name === "list_files" &&
       Array.isArray(tool.result)
     ) {
       return `${tool.result.length} item${
-        tool.result.length === 1 ? "" : "s"
+        tool.result.length === 1
+          ? ""
+          : "s"
       } found`;
     }
 
+
     return formatValue(tool.result);
   }
+
+
+  // =========================================
+  // TOOL ICON
+  // =========================================
 
   function getToolIcon(name: string) {
     switch (name) {
@@ -238,17 +329,29 @@ function App() {
     }
   }
 
+
+  // =========================================
+  // TOOL ACTIVITY
+  // =========================================
+
   function renderToolActivity(
     tools?: ToolCall[]
   ) {
-    if (!tools || tools.length === 0) {
+    if (
+      !tools ||
+      tools.length === 0
+    ) {
       return null;
     }
 
+
     return (
       <div className="agent-activity">
+
         <div className="activity-header">
+
           <div className="activity-title">
+
             <span className="activity-icon">
               ⚙
             </span>
@@ -256,7 +359,9 @@ function App() {
             <span>
               Agent activity
             </span>
+
           </div>
+
 
           <span className="activity-count">
             {tools.length}{" "}
@@ -264,78 +369,116 @@ function App() {
               ? "tool"
               : "tools"}
           </span>
+
         </div>
+
 
         <div className="activity-list">
-          {tools.map((tool, index) => (
-            <div
-              className="tool-card"
-              key={`${tool.name}-${index}`}
-            >
-              <div className="tool-top">
-                <div className="tool-name">
-                  <span className="tool-success">
-                    ✓
-                  </span>
 
-                  <span className="tool-icon">
-                    {getToolIcon(tool.name)}
-                  </span>
+          {tools.map(
+            (tool, index) => (
 
-                  <strong>
-                    {tool.name}
-                  </strong>
+              <div
+                className="tool-card"
+                key={`${tool.name}-${index}`}
+              >
 
-                  <span className="tool-source">
-                    {tool.source?.toUpperCase() ||
-                      "LOCAL"}
-                  </span>
-                </div>
-              </div>
+                <div className="tool-top">
 
-              {tool.arguments &&
-                Object.keys(tool.arguments)
-                  .length > 0 && (
-                  <div className="tool-arguments">
-                    {formatArguments(
-                      tool.arguments
-                    )}
+                  <div className="tool-name">
+
+                    <span className="tool-success">
+                      ✓
+                    </span>
+
+                    <span className="tool-icon">
+                      {getToolIcon(tool.name)}
+                    </span>
+
+                    <strong>
+                      {tool.name}
+                    </strong>
+
+                    <span className="tool-source">
+                      {tool.source?.toUpperCase() ||
+                        "LOCAL"}
+                    </span>
+
                   </div>
-                )}
 
-              <div className="tool-result">
-                <span className="result-label">
-                  Result:
-                </span>
+                </div>
 
-                <span>
-                  {getToolResult(tool)}
-                </span>
+
+                {tool.arguments &&
+                  Object.keys(
+                    tool.arguments
+                  ).length > 0 && (
+
+                    <div className="tool-arguments">
+
+                      {formatArguments(
+                        tool.arguments
+                      )}
+
+                    </div>
+                  )}
+
+
+                <div className="tool-result">
+
+                  <span className="result-label">
+                    Result:
+                  </span>
+
+                  <span>
+                    {getToolResult(tool)}
+                  </span>
+
+                </div>
+
               </div>
-            </div>
-          ))}
+            )
+          )}
+
         </div>
+
       </div>
     );
   }
 
+
+  // =========================================
+  // UI
+  // =========================================
+
   return (
     <div className="app">
+
       {/* SIDEBAR */}
+
       <aside className="sidebar">
+
         <div className="brand">
+
           <div className="brand-logo">
             A
           </div>
 
+
           <div>
-            <h1>AgentOS</h1>
+
+            <h1>
+              AgentOS
+            </h1>
 
             <p>
               AI Agent Platform
             </p>
+
           </div>
+
         </div>
+
 
         <button
           className="new-chat-button"
@@ -345,10 +488,13 @@ function App() {
           New Chat
         </button>
 
+
         <div className="tools-section">
+
           <div className="section-title">
             TOOLS
           </div>
+
 
           <div className="tool-sidebar-item">
             <span>🧮</span>
@@ -356,11 +502,13 @@ function App() {
             <span className="status-dot" />
           </div>
 
+
           <div className="tool-sidebar-item">
             <span>🌐</span>
             <span>Web Search</span>
             <span className="status-dot" />
           </div>
+
 
           <div className="tool-sidebar-item">
             <span>📁</span>
@@ -368,15 +516,20 @@ function App() {
             <span className="status-dot" />
           </div>
 
+
           <div className="tool-sidebar-item">
             <span>🔌</span>
             <span>MCP</span>
             <span className="status-dot" />
           </div>
+
         </div>
 
+
         <div className="sidebar-bottom">
+
           <div className="backend-status">
+
             <span
               className={`backend-dot ${
                 backendOnline
@@ -390,19 +543,29 @@ function App() {
                 ? "Backend connected"
                 : "Backend offline"}
             </span>
+
           </div>
+
 
           <div className="version">
             AgentOS v0.1.0
           </div>
+
         </div>
+
       </aside>
 
+
       {/* MAIN */}
+
       <main className="main">
+
         {/* HEADER */}
+
         <header className="header">
+
           <div>
+
             <h2>
               Agent Workspace
             </h2>
@@ -411,7 +574,9 @@ function App() {
               Tool-using AI agent powered by
               Gemini + LangGraph
             </p>
+
           </div>
+
 
           <div
             className={`online-badge ${
@@ -420,18 +585,26 @@ function App() {
                 : "offline"
             }`}
           >
+
             <span className="online-dot" />
 
             {backendOnline
               ? "Online"
               : "Offline"}
+
           </div>
+
         </header>
 
+
         {/* CHAT */}
+
         <div className="chat-container">
+
           {messages.length === 0 && (
+
             <div className="welcome">
+
               <div className="welcome-logo">
                 A
               </div>
@@ -445,70 +618,105 @@ function App() {
                 the web, manage files, or
                 use connected MCP tools.
               </p>
+
             </div>
+
           )}
 
-          {messages.map((message) => (
-            <div
-              className={`message-row ${
-                message.role
-              }`}
-              key={message.id}
-            >
-              <div className="avatar">
-                {message.role === "user"
-                  ? "You"
-                  : "A"}
-              </div>
 
-              <div className="message-content">
-                <div className="message-author">
+          {messages.map(
+            (message) => (
+
+              <div
+                className={`message-row ${
+                  message.role
+                }`}
+                key={message.id}
+              >
+
+                <div className="avatar">
+
                   {message.role === "user"
                     ? "You"
-                    : "AgentOS"}
+                    : "A"}
+
                 </div>
 
-                {message.role ===
-                  "assistant" &&
-                  renderToolActivity(
-                    message.tools
-                  )}
 
-                <div className="message-text">
-                  <ReactMarkdown>
-                    {message.content}
-                  </ReactMarkdown>
+                <div className="message-content">
+
+                  <div className="message-author">
+
+                    {message.role === "user"
+                      ? "You"
+                      : "AgentOS"}
+
+                  </div>
+
+
+                  {message.role ===
+                    "assistant" &&
+                    renderToolActivity(
+                      message.tools
+                    )}
+
+
+                  <div className="message-text">
+
+                    <ReactMarkdown>
+                      {message.content}
+                    </ReactMarkdown>
+
+                  </div>
+
                 </div>
+
               </div>
-            </div>
-          ))}
+
+            )
+          )}
+
 
           {loading && (
+
             <div className="message-row assistant">
+
               <div className="avatar">
                 A
               </div>
 
               <div className="message-content">
+
                 <div className="message-author">
                   AgentOS
                 </div>
 
                 <div className="typing-indicator">
+
                   <span />
                   <span />
                   <span />
+
                 </div>
+
               </div>
+
             </div>
+
           )}
 
+
           <div ref={messagesEndRef} />
+
         </div>
 
+
         {/* INPUT */}
+
         <div className="input-area">
+
           <div className="input-wrapper">
+
             <textarea
               value={input}
               onChange={(event) =>
@@ -519,6 +727,7 @@ function App() {
               rows={1}
               disabled={loading}
             />
+
 
             <button
               className="send-button"
@@ -532,17 +741,23 @@ function App() {
             >
               ↑
             </button>
+
           </div>
+
 
           <div className="input-hint">
             AgentOS can use tools when needed
             · Enter to send
             · Shift + Enter for new line
           </div>
+
         </div>
+
       </main>
+
     </div>
   );
 }
+
 
 export default App;
