@@ -31,12 +31,45 @@ class Agent:
                 f"Registered MCP tool: {tool_name}"
             )
 
-    def run(self, message: str) -> str:
-        response = self.llm.generate(message)
+    def run(
+        self,
+        message: str,
+        history=None,
+    ):
+        """
+        Run AgentOS with optional conversation history.
+
+        Returns:
+            {
+                "response": str,
+                "tools": list
+            }
+        """
+
+        history = history or []
+
+        # -----------------------------------------------------
+        # INITIAL LLM REQUEST
+        # -----------------------------------------------------
+
+        if history:
+            response = self.llm.generate_with_history(
+                message=message,
+                history=history,
+            )
+        else:
+            response = self.llm.generate(message)
 
         max_iterations = 10
 
+        executed_tools = []
+
+        # -----------------------------------------------------
+        # TOOL LOOP
+        # -----------------------------------------------------
+
         for iteration in range(max_iterations):
+
             candidate = response.candidates[0]
 
             tool_calls = [
@@ -45,12 +78,24 @@ class Agent:
                 if part.function_call
             ]
 
+            # -------------------------------------------------
+            # NO TOOL CALL
+            # -------------------------------------------------
+
             if not tool_calls:
-                return response.text
+                return {
+                    "response": response.text,
+                    "tools": executed_tools,
+                }
 
             tool_results = []
 
+            # -------------------------------------------------
+            # EXECUTE TOOLS
+            # -------------------------------------------------
+
             for function_call in tool_calls:
+
                 tool_name = function_call.name
                 tool_args = dict(function_call.args)
 
@@ -65,11 +110,12 @@ class Agent:
                     f"Arguments: {tool_args}"
                 )
 
-                # -------------------------
+                # ---------------------------------------------
                 # PERMISSION CHECK
-                # -------------------------
+                # ---------------------------------------------
 
                 if not is_tool_allowed(tool_name):
+
                     print(
                         "Permission: denied"
                     )
@@ -82,9 +128,9 @@ class Agent:
                     "Permission: allowed"
                 )
 
-                # -------------------------
+                # ---------------------------------------------
                 # LOCAL TOOL
-                # -------------------------
+                # ---------------------------------------------
 
                 if tool_name in TOOL_REGISTRY:
 
@@ -100,9 +146,11 @@ class Agent:
                         **tool_args
                     )
 
-                # -------------------------
+                    tool_source = "local"
+
+                # ---------------------------------------------
                 # MCP TOOL
-                # -------------------------
+                # ---------------------------------------------
 
                 elif tool_name in self.mcp_tools:
 
@@ -117,9 +165,11 @@ class Agent:
                         )
                     )
 
-                # -------------------------
+                    tool_source = "MCP"
+
+                # ---------------------------------------------
                 # UNKNOWN TOOL
-                # -------------------------
+                # ---------------------------------------------
 
                 else:
 
@@ -127,14 +177,15 @@ class Agent:
                         f"Unknown tool: {tool_name}"
                     )
 
-                # -------------------------
-                # STORE TOOL RESULT
-                # -------------------------
+                # ---------------------------------------------
+                # LOG RESULT
+                # ---------------------------------------------
 
                 print(
                     f"Tool result: {tool_result}"
                 )
 
+                # Internal Gemini tool result
                 tool_results.append(
                     {
                         "function_call": function_call,
@@ -142,17 +193,42 @@ class Agent:
                     }
                 )
 
-            # -------------------------
-            # SEND RESULTS BACK TO GEMINI
-            # -------------------------
-
-            response = (
-                self.llm.generate_with_tool_results(
-                    message=message,
-                    original_response=response,
-                    tool_results=tool_results,
+                # Frontend-safe tool activity
+                executed_tools.append(
+                    {
+                        "name": tool_name,
+                        "arguments": tool_args,
+                        "result": tool_result,
+                        "source": tool_source,
+                        "iteration": iteration + 1,
+                    }
                 )
-            )
+
+            # -------------------------------------------------
+            # SEND TOOL RESULTS BACK TO GEMINI
+            # -------------------------------------------------
+
+            if history:
+                response = (
+                    self.llm.generate_with_tool_results(
+                        message=message,
+                        original_response=response,
+                        tool_results=tool_results,
+                        history=history,
+                    )
+                )
+            else:
+                response = (
+                    self.llm.generate_with_tool_results(
+                        message=message,
+                        original_response=response,
+                        tool_results=tool_results,
+                    )
+                )
+
+        # -----------------------------------------------------
+        # MAX ITERATION PROTECTION
+        # -----------------------------------------------------
 
         raise RuntimeError(
             "Agent exceeded the maximum number "
