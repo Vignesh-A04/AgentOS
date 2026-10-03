@@ -46,7 +46,12 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [backendOnline, setBackendOnline] = useState(true);
+
+  const [backendOnline, setBackendOnline] =
+    useState(false);
+
+  const [backendStarting, setBackendStarting] =
+    useState(true);
 
   const messagesEndRef =
     useRef<HTMLDivElement | null>(null);
@@ -70,15 +75,31 @@ function App() {
   async function checkBackend() {
     try {
       const response = await fetch(
-        `${API_URL}/health`
+        `${API_URL}/health`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
       );
 
-      setBackendOnline(response.ok);
+      if (response.ok) {
+        setBackendOnline(true);
+        setBackendStarting(false);
+      } else {
+        setBackendOnline(false);
+        setBackendStarting(true);
+      }
+
     } catch {
       setBackendOnline(false);
+      setBackendStarting(true);
     }
   }
 
+
+  // =========================================
+  // HEALTH CHECK LOOP
+  // =========================================
 
   useEffect(() => {
     checkBackend();
@@ -88,7 +109,9 @@ function App() {
       10000
     );
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
 
 
@@ -103,6 +126,14 @@ function App() {
       return;
     }
 
+    if (!backendOnline) {
+      return;
+    }
+
+
+    // -----------------------------------------
+    // Create user message
+    // -----------------------------------------
 
     const userMessage: Message = {
       id: Date.now(),
@@ -110,6 +141,10 @@ function App() {
       content: message,
     };
 
+
+    // -----------------------------------------
+    // Add user message to UI
+    // -----------------------------------------
 
     setMessages((previous) => [
       ...previous,
@@ -121,6 +156,11 @@ function App() {
 
 
     try {
+
+      // ---------------------------------------
+      // Send request to backend
+      // ---------------------------------------
+
       const response = await fetch(
         `${API_URL}/agent/run`,
         {
@@ -131,16 +171,24 @@ function App() {
           },
 
           body: JSON.stringify({
+
             message,
 
+            // Send previous conversation
+            // history to Gemini through backend
             history: messages.map((msg) => ({
               role: msg.role,
               content: msg.content,
             })),
+
           }),
         }
       );
 
+
+      // ---------------------------------------
+      // Backend error
+      // ---------------------------------------
 
       if (!response.ok) {
         throw new Error(
@@ -149,38 +197,68 @@ function App() {
       }
 
 
+      // ---------------------------------------
+      // Parse response
+      // ---------------------------------------
+
       const data: AgentResponse =
         await response.json();
 
 
+      // ---------------------------------------
+      // Create assistant message
+      // ---------------------------------------
+
       const assistantMessage: Message = {
         id: Date.now() + 1,
+
         role: "assistant",
+
         content:
           data.response ||
           "I couldn't generate a response.",
+
         tools: data.tools || [],
       };
 
+
+      // ---------------------------------------
+      // Add assistant message
+      // ---------------------------------------
 
       setMessages((previous) => [
         ...previous,
         assistantMessage,
       ]);
 
+
+      // Backend is confirmed working
       setBackendOnline(true);
+      setBackendStarting(false);
 
     } catch (error) {
-      console.error(error);
+
+      console.error(
+        "AgentOS backend error:",
+        error
+      );
+
 
       setBackendOnline(false);
+      setBackendStarting(true);
 
+
+      // ---------------------------------------
+      // Display connection error
+      // ---------------------------------------
 
       const errorMessage: Message = {
         id: Date.now() + 1,
+
         role: "assistant",
+
         content:
-          "Sorry, I couldn't connect to the AgentOS backend.",
+          "The AgentOS backend is starting or temporarily unavailable. Please try again in a few seconds.",
       };
 
 
@@ -196,7 +274,7 @@ function App() {
 
 
   // =========================================
-  // KEYBOARD
+  // KEYBOARD HANDLER
   // =========================================
 
   function handleKeyDown(
@@ -207,6 +285,7 @@ function App() {
       !event.shiftKey
     ) {
       event.preventDefault();
+
       sendMessage();
     }
   }
@@ -223,10 +302,13 @@ function App() {
 
 
   // =========================================
-  // FORMAT VALUES
+  // FORMAT VALUE
   // =========================================
 
-  function formatValue(value: unknown): string {
+  function formatValue(
+    value: unknown
+  ): string {
+
     if (
       value === null ||
       value === undefined
@@ -235,22 +317,33 @@ function App() {
     }
 
 
-    if (typeof value === "string") {
+    if (
+      typeof value === "string"
+    ) {
       return value;
     }
 
 
     try {
+
       return JSON.stringify(value);
+
     } catch {
+
       return String(value);
+
     }
   }
 
 
+  // =========================================
+  // FORMAT ARGUMENTS
+  // =========================================
+
   function formatArguments(
     args?: Record<string, unknown>
   ) {
+
     if (!args) {
       return null;
     }
@@ -258,29 +351,34 @@ function App() {
 
     return Object.entries(args).map(
       ([key, value]) => (
+
         <span
           className="argument-chip"
           key={key}
         >
           {key}: {formatValue(value)}
         </span>
+
       )
     );
   }
 
 
   // =========================================
-  // TOOL RESULTS
+  // TOOL RESULT
   // =========================================
 
   function getToolResult(
     tool: ToolCall
   ): string {
+
     if (
       tool.name === "web_search" &&
       Array.isArray(tool.result)
     ) {
+
       return `Search completed — ${tool.result.length} results found`;
+
     }
 
 
@@ -288,15 +386,19 @@ function App() {
       tool.name === "list_files" &&
       Array.isArray(tool.result)
     ) {
+
       return `${tool.result.length} item${
         tool.result.length === 1
           ? ""
           : "s"
       } found`;
+
     }
 
 
-    return formatValue(tool.result);
+    return formatValue(
+      tool.result
+    );
   }
 
 
@@ -304,8 +406,12 @@ function App() {
   // TOOL ICON
   // =========================================
 
-  function getToolIcon(name: string) {
+  function getToolIcon(
+    name: string
+  ) {
+
     switch (name) {
+
       case "calculator":
         return "🧮";
 
@@ -337,6 +443,7 @@ function App() {
   function renderToolActivity(
     tools?: ToolCall[]
   ) {
+
     if (
       !tools ||
       tools.length === 0
@@ -346,7 +453,10 @@ function App() {
 
 
     return (
+
       <div className="agent-activity">
+
+        {/* Activity Header */}
 
         <div className="activity-header">
 
@@ -364,14 +474,19 @@ function App() {
 
 
           <span className="activity-count">
+
             {tools.length}{" "}
+
             {tools.length === 1
               ? "tool"
               : "tools"}
+
           </span>
 
         </div>
 
+
+        {/* Activity List */}
 
         <div className="activity-list">
 
@@ -383,6 +498,8 @@ function App() {
                 key={`${tool.name}-${index}`}
               >
 
+                {/* Tool Name */}
+
                 <div className="tool-top">
 
                   <div className="tool-name">
@@ -391,23 +508,32 @@ function App() {
                       ✓
                     </span>
 
+
                     <span className="tool-icon">
-                      {getToolIcon(tool.name)}
+                      {getToolIcon(
+                        tool.name
+                      )}
                     </span>
+
 
                     <strong>
                       {tool.name}
                     </strong>
 
+
                     <span className="tool-source">
+
                       {tool.source?.toUpperCase() ||
                         "LOCAL"}
+
                     </span>
 
                   </div>
 
                 </div>
 
+
+                {/* Tool Arguments */}
 
                 {tool.arguments &&
                   Object.keys(
@@ -421,8 +547,11 @@ function App() {
                       )}
 
                     </div>
+
                   )}
 
+
+                {/* Tool Result */}
 
                 <div className="tool-result">
 
@@ -437,12 +566,14 @@ function App() {
                 </div>
 
               </div>
+
             )
           )}
 
         </div>
 
       </div>
+
     );
   }
 
@@ -452,11 +583,18 @@ function App() {
   // =========================================
 
   return (
+
     <div className="app">
 
-      {/* SIDEBAR */}
+
+      {/* =====================================
+          SIDEBAR
+          ===================================== */}
 
       <aside className="sidebar">
+
+
+        {/* Brand */}
 
         <div className="brand">
 
@@ -480,14 +618,23 @@ function App() {
         </div>
 
 
+        {/* New Chat */}
+
         <button
           className="new-chat-button"
           onClick={startNewChat}
         >
-          <span>＋</span>
+
+          <span>
+            ＋
+          </span>
+
           New Chat
+
         </button>
 
+
+        {/* Tools */}
 
         <div className="tools-section">
 
@@ -497,36 +644,73 @@ function App() {
 
 
           <div className="tool-sidebar-item">
-            <span>🧮</span>
-            <span>Calculator</span>
+
+            <span>
+              🧮
+            </span>
+
+            <span>
+              Calculator
+            </span>
+
             <span className="status-dot" />
+
           </div>
 
 
           <div className="tool-sidebar-item">
-            <span>🌐</span>
-            <span>Web Search</span>
+
+            <span>
+              🌐
+            </span>
+
+            <span>
+              Web Search
+            </span>
+
             <span className="status-dot" />
+
           </div>
 
 
           <div className="tool-sidebar-item">
-            <span>📁</span>
-            <span>Filesystem</span>
+
+            <span>
+              📁
+            </span>
+
+            <span>
+              Filesystem
+            </span>
+
             <span className="status-dot" />
+
           </div>
 
 
           <div className="tool-sidebar-item">
-            <span>🔌</span>
-            <span>MCP</span>
+
+            <span>
+              🔌
+            </span>
+
+            <span>
+              MCP
+            </span>
+
             <span className="status-dot" />
+
           </div>
 
         </div>
 
 
+        {/* Sidebar Bottom */}
+
         <div className="sidebar-bottom">
+
+
+          {/* Backend Status */}
 
           <div className="backend-status">
 
@@ -534,18 +718,27 @@ function App() {
               className={`backend-dot ${
                 backendOnline
                   ? "online"
-                  : "offline"
+                  : backendStarting
+                    ? "starting"
+                    : "offline"
               }`}
             />
 
+
             <span>
+
               {backendOnline
                 ? "Backend connected"
-                : "Backend offline"}
+                : backendStarting
+                  ? "Starting backend..."
+                  : "Backend offline"}
+
             </span>
 
           </div>
 
+
+          {/* Version */}
 
           <div className="version">
             AgentOS v0.1.0
@@ -556,19 +749,24 @@ function App() {
       </aside>
 
 
-      {/* MAIN */}
+      {/* =====================================
+          MAIN
+          ===================================== */}
 
       <main className="main">
 
-        {/* HEADER */}
+
+        {/* Header */}
 
         <header className="header">
+
 
           <div>
 
             <h2>
               Agent Workspace
             </h2>
+
 
             <p>
               Tool-using AI agent powered by
@@ -578,28 +776,40 @@ function App() {
           </div>
 
 
+          {/* Online Badge */}
+
           <div
             className={`online-badge ${
               backendOnline
                 ? "online"
-                : "offline"
+                : backendStarting
+                  ? "starting"
+                  : "offline"
             }`}
           >
 
             <span className="online-dot" />
 
+
             {backendOnline
               ? "Online"
-              : "Offline"}
+              : backendStarting
+                ? "Starting..."
+                : "Offline"}
 
           </div>
 
         </header>
 
 
-        {/* CHAT */}
+        {/* ===================================
+            CHAT
+            =================================== */}
 
         <div className="chat-container">
+
+
+          {/* Welcome */}
 
           {messages.length === 0 && (
 
@@ -609,9 +819,11 @@ function App() {
                 A
               </div>
 
+
               <h3>
                 Welcome to AgentOS
               </h3>
+
 
               <p>
                 Ask me to calculate, search
@@ -624,6 +836,8 @@ function App() {
           )}
 
 
+          {/* Messages */}
+
           {messages.map(
             (message) => (
 
@@ -634,6 +848,9 @@ function App() {
                 key={message.id}
               >
 
+
+                {/* Avatar */}
+
                 <div className="avatar">
 
                   {message.role === "user"
@@ -643,7 +860,12 @@ function App() {
                 </div>
 
 
+                {/* Content */}
+
                 <div className="message-content">
+
+
+                  {/* Author */}
 
                   <div className="message-author">
 
@@ -654,12 +876,16 @@ function App() {
                   </div>
 
 
+                  {/* Tool Activity */}
+
                   {message.role ===
                     "assistant" &&
                     renderToolActivity(
                       message.tools
                     )}
 
+
+                  {/* Message */}
 
                   <div className="message-text">
 
@@ -677,6 +903,8 @@ function App() {
           )}
 
 
+          {/* Loading */}
+
           {loading && (
 
             <div className="message-row assistant">
@@ -685,11 +913,13 @@ function App() {
                 A
               </div>
 
+
               <div className="message-content">
 
                 <div className="message-author">
                   AgentOS
                 </div>
+
 
                 <div className="typing-indicator">
 
@@ -711,44 +941,74 @@ function App() {
         </div>
 
 
-        {/* INPUT */}
+        {/* ===================================
+            INPUT
+            =================================== */}
 
         <div className="input-area">
 
+
           <div className="input-wrapper">
+
 
             <textarea
               value={input}
+
               onChange={(event) =>
-                setInput(event.target.value)
+                setInput(
+                  event.target.value
+                )
               }
+
               onKeyDown={handleKeyDown}
-              placeholder="Ask AgentOS anything..."
+
+              placeholder={
+                backendOnline
+                  ? "Ask AgentOS anything..."
+                  : backendStarting
+                    ? "Starting AgentOS backend..."
+                    : "Backend unavailable"
+              }
+
               rows={1}
-              disabled={loading}
+
+              disabled={
+                loading ||
+                !backendOnline
+              }
+
             />
 
 
             <button
               className="send-button"
+
               onClick={sendMessage}
+
               disabled={
                 !input.trim() ||
                 loading ||
                 !backendOnline
               }
+
               aria-label="Send message"
             >
+
               ↑
+
             </button>
 
           </div>
 
 
           <div className="input-hint">
-            AgentOS can use tools when needed
-            · Enter to send
-            · Shift + Enter for new line
+
+            {backendOnline
+              ? "AgentOS can use tools when needed · Enter to send · Shift + Enter for new line"
+              : backendStarting
+                ? "Waking up the AgentOS backend..."
+                : "AgentOS backend is unavailable"}
+
           </div>
 
         </div>
@@ -756,6 +1016,7 @@ function App() {
       </main>
 
     </div>
+
   );
 }
 
